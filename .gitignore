@@ -24,6 +24,9 @@
 .DS_Store
 *.pem
 
+# Prisma generated
+src/generated/
+
 # debug
 npm-debug.log*
 yarn-debug.log*
