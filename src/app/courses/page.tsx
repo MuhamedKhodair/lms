@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { Pagination } from "@/components/pagination";
 import type { CourseResponse, PaginatedResponse } from "@/types";
 
 function CourseCard({ course }: { course: CourseResponse }) {
@@ -77,9 +78,19 @@ function CourseCard({ course }: { course: CourseResponse }) {
 
 export default function CoursesPage() {
   const [data, setData] = useState<PaginatedResponse<CourseResponse> | null>(null);
+  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");
   const [page, setPage] = useState(1);
+
+  // Debounce search input 400ms
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setSearch(searchInput);
+      setPage(1);
+    }, 400);
+    return () => clearTimeout(t);
+  }, [searchInput]);
 
   useEffect(() => {
     async function load() {
@@ -113,9 +124,9 @@ export default function CoursesPage() {
               <input
                 type="text"
                 placeholder="Search courses..."
-                value={search}
-                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                className="block w-full rounded-lg border border-border bg-white pl-10 pr-3 py-2.5 text-sm shadow-xs focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                className="block w-full rounded-lg border border-border bg-card pl-10 pr-3 py-2.5 text-sm text-text placeholder:text-text-muted shadow-xs focus:border-primary focus:ring-1 focus:ring-primary outline-none"
               />
             </div>
             <select
@@ -150,39 +161,9 @@ export default function CoursesPage() {
           )}
         </div>
 
-        {data && data.totalPages > 1 && (
-          <div className="mt-10 flex items-center justify-center gap-3">
-            <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-text shadow-xs hover:bg-surface transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-              Previous
-            </button>
-            <div className="flex items-center gap-1.5">
-              {Array.from({ length: data.totalPages }, (_, i) => i + 1).map((p) => (
-                <button
-                  key={p}
-                  onClick={() => setPage(p)}
-                  className={`w-9 h-9 rounded-lg text-sm font-medium transition-colors ${
-                    p === page
-                      ? "bg-primary text-white shadow-xs"
-                      : "text-text-muted hover:bg-surface hover:text-text"
-                  }`}
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
-              disabled={page === data.totalPages}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-text shadow-xs hover:bg-surface transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Next
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-            </button>
+        {data && (
+          <div className="mt-10">
+            <Pagination page={page} totalPages={data.totalPages} onPageChange={setPage} />
           </div>
         )}
       </div>

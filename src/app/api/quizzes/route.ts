@@ -22,10 +22,14 @@ export async function POST(request: NextRequest) {
         ...quizData,
         questions: questions
           ? {
-              create: questions.map((q: Record<string, unknown>) => {
+              create: (questions as unknown[]).map((q) => {
                 const qParsed = quizQuestionSchema.safeParse(q);
                 if (!qParsed.success) throw new Error("Invalid question");
-                return qParsed.data;
+                const d = qParsed.data;
+                return {
+                  ...d,
+                  optionsJson: Array.isArray(d.optionsJson) ? JSON.stringify(d.optionsJson) : d.optionsJson,
+                };
               }),
             }
           : undefined,

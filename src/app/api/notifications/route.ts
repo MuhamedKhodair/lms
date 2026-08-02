@@ -1,20 +1,27 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAuthUser } from "@/lib/auth";
-import { apiSuccess, apiError } from "@/lib/utils";
+import { apiSuccess, apiError, parsePagination } from "@/lib/utils";
 
 export async function GET(request: NextRequest) {
   try {
     const user = await getAuthUser(request);
     if (!user) return apiError("Unauthorized", 401);
 
-    const notifications = await prisma.notification.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: "desc" },
-      take: 50,
-    });
+    const { searchParams } = request.nextUrl;
+    const { page, limit, skip } = parsePagination(searchParams, 50);
 
-    return apiSuccess(notifications);
+    const [notifications, total] = await Promise.all([
+      prisma.notification.findMany({
+        where: { userId: user.id },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.notification.count({ where: { userId: user.id } }),
+    ]);
+
+    return apiSuccess({ data: notifications, page, limit, total, totalPages: Math.ceil(total / limit) });
   } catch (error) {
     console.error("Notifications GET error:", error);
     return apiError("Internal server error", 500);

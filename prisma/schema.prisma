@@ -31,6 +31,7 @@ model User {
   discussions  Discussion[]
   notifications Notification[]
   comments     Comment[]
+  passwordResetTokens PasswordResetToken[]
 
   @@map("users")
 }
@@ -196,6 +197,19 @@ model Comment {
   user      User     @relation(fields: [userId], references: [id])
 
   @@map("comments")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("password_reset_tokens")
 }
 
 model Notification {

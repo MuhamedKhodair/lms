@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
+import { Pagination } from "@/components/pagination";
 
 interface AdminCourse {
   id: string;
@@ -110,26 +111,11 @@ export default function AdminCoursesPage() {
       </div>
 
       {totalPages > 1 && (
-        <div className="mt-4 flex items-center justify-between">
+        <div className="mt-4 flex flex-col items-center gap-2">
           <p className="text-sm text-text-muted">
             Page {page} of {totalPages}
           </p>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setPage(p => Math.max(1, p - 1))}
-              disabled={page <= 1}
-              className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-text-muted hover:bg-surface disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              Previous
-            </button>
-            <button
-              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-              disabled={page >= totalPages}
-              className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-text-muted hover:bg-surface disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              Next
-            </button>
-          </div>
+          <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
         </div>
       )}
     </div>

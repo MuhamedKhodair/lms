@@ -2,9 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { comparePassword, signToken } from "@/lib/auth";
 import { loginSchema, apiError } from "@/lib/utils";
+import { rateLimit, clientKey, rateLimitResponse } from "@/lib/rate-limit";
 
 export async function POST(request: NextRequest) {
   try {
+    const rl = rateLimit(clientKey(request, "login"), { limit: 8, windowMs: 60_000 });
+    if (!rl.success) return rateLimitResponse(rl);
+
     const body = await request.json();
     const parsed = loginSchema.safeParse(body);
     if (!parsed.success) {

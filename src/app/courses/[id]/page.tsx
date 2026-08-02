@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import type { CourseResponse, LessonResponse, CommentResponse } from "@/types";
@@ -32,6 +33,15 @@ export default function CourseDetailPage() {
   const [discussionContent, setDiscussionContent] = useState("");
   const [discussions, setDiscussions] = useState<Record<string, unknown>[]>([]);
   const [commentText, setCommentText] = useState("");
+  const [instructorMenuOpen, setInstructorMenuOpen] = useState(false);
+  const [courseEditOpen, setCourseEditOpen] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editCategory, setEditCategory] = useState("");
+  const [editPrice, setEditPrice] = useState(0);
+  const [editImageUrl, setEditImageUrl] = useState("");
+  const [editPublished, setEditPublished] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -133,6 +143,30 @@ export default function CourseDetailPage() {
           ),
         };
       });
+    }
+  }
+
+  async function handleEditCourse() {
+    const token = localStorage.getItem("token");
+    const res = await fetch(`/api/courses/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        title: editTitle,
+        description: editDescription,
+        category: editCategory,
+        price: editPrice,
+        imageUrl: editImageUrl,
+        published: editPublished,
+      }),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setCourse(updated);
+      setCourseEditOpen(false);
+      setEditing(false);
+    } else {
+      alert("Failed to update course");
     }
   }
 
@@ -292,9 +326,71 @@ export default function CourseDetailPage() {
                 Enroll now {course.price > 0 && `- $${course.price}`}
               </button>
             ) : isInstructor ? (
-              <span className="inline-flex items-center rounded-full bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary">
-                You are the instructor
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center rounded-full bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary">
+                  You are the instructor
+                </span>
+                <div className="relative">
+                  <button
+                    onClick={() => setInstructorMenuOpen(!instructorMenuOpen)}
+                    className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-3 py-1.5 text-sm font-medium text-text hover:bg-surface transition-colors"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 12a.75.75 0 110-1.5.75.75 0 010 1.5zM12 18.75a.75.75 0 110-1.5.75.75 0 010 1.5z" />
+                    </svg>
+                    Manage
+                  </button>
+                  {instructorMenuOpen && (
+                    <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-xl border border-border bg-card shadow-lg overflow-hidden">
+                      <Link
+                        href={`/courses/${id}/quizzes/new`}
+                        onClick={() => setInstructorMenuOpen(false)}
+                        className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-text hover:bg-surface transition-colors"
+                      >
+                        <svg className="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
+                        </svg>
+                        New Quiz
+                      </Link>
+                      <button
+                        onClick={() => {
+                          setEditTitle(course.title);
+                          setEditDescription(course.description);
+                          setEditCategory(course.category || "");
+                          setEditPrice(course.price);
+                          setEditImageUrl(course.imageUrl || "");
+                          setEditPublished(course.published);
+                          setCourseEditOpen(true);
+                          setInstructorMenuOpen(false);
+                        }}
+                        className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-text hover:bg-surface transition-colors text-left"
+                      >
+                        <svg className="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zM8 13a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm18 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
+                        </svg>
+                        Edit Course
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (!confirm("Are you sure you want to delete this course? This action cannot be undone.")) return;
+                          const token = localStorage.getItem("token");
+                          await fetch(`/api/courses/${id}`, {
+                            method: "DELETE",
+                            headers: { Authorization: `Bearer ${token}` },
+                          });
+                          router.push("/courses");
+                        }}
+                        className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-danger hover:bg-danger/5 transition-colors text-left"
+                      >
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                        </svg>
+                        Delete Course
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
             ) : (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
@@ -672,6 +768,106 @@ export default function CourseDetailPage() {
             )}
           </div>
         </div>
+
+        {/* ===== Edit Course Modal ===== */}
+        {courseEditOpen && (
+          <div
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-xs px-4"
+            onClick={(e) => e.target === e.currentTarget && setCourseEditOpen(false)}
+          >
+            <div
+              className="w-full max-w-lg rounded-xl border border-border bg-card p-6 shadow-2xl max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-text">Edit course</h2>
+                <button
+                  onClick={() => setCourseEditOpen(false)}
+                  className="rounded-lg p-1.5 text-text-muted hover:bg-surface hover:text-text transition-colors"
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div className="mt-5 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-text">Title</label>
+                  <input
+                    type="text"
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    className="mt-1.5 block w-full rounded-lg border border-border bg-card px-3 py-2.5 text-sm text-text placeholder:text-text-muted shadow-xs focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-text">Description</label>
+                  <textarea
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    rows={3}
+                    className="mt-1.5 block w-full rounded-lg border border-border bg-card px-3 py-2.5 text-sm text-text placeholder:text-text-muted shadow-xs focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                  />
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-sm font-medium text-text">Category</label>
+                    <input
+                      type="text"
+                      value={editCategory}
+                      onChange={(e) => setEditCategory(e.target.value)}
+                      className="mt-1.5 block w-full rounded-lg border border-border bg-card px-3 py-2.5 text-sm text-text placeholder:text-text-muted shadow-xs focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-text">Price ($)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={editPrice}
+                      onChange={(e) => setEditPrice(parseFloat(e.target.value) || 0)}
+                      className="mt-1.5 block w-full rounded-lg border border-border bg-card px-3 py-2.5 text-sm text-text placeholder:text-text-muted shadow-xs focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-text">Image URL</label>
+                  <input
+                    type="text"
+                    value={editImageUrl}
+                    onChange={(e) => setEditImageUrl(e.target.value)}
+                    className="mt-1.5 block w-full rounded-lg border border-border bg-card px-3 py-2.5 text-sm text-text placeholder:text-text-muted shadow-xs focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                  />
+                </div>
+                <label className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    checked={editPublished}
+                    onChange={(e) => setEditPublished(e.target.checked)}
+                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                  />
+                  <span className="text-sm text-text">Published</span>
+                </label>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={handleEditCourse}
+                    disabled={editing}
+                    className="flex-1 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-dark shadow-xs transition-all disabled:opacity-50"
+                  >
+                    {editing ? "Saving..." : "Save changes"}
+                  </button>
+                  <button
+                    onClick={() => setCourseEditOpen(false)}
+                    className="rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-text hover:bg-surface transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

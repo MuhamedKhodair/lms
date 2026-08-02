@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
+import { NotificationBell } from "@/components/notification-bell";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export function Header() {
   const { user, logout } = useAuth();
@@ -13,6 +15,7 @@ export function Header() {
           <span className="text-primary">L</span>MS
         </Link>
         <nav className="flex items-center gap-4 text-sm">
+          <ThemeToggle />
           <Link
             href="/courses"
             className="font-medium text-text-muted hover:text-text transition-colors"
@@ -35,8 +38,34 @@ export function Header() {
               >
                 Dashboard
               </Link>
+              {(user.role === "INSTRUCTOR" || user.role === "ADMIN") && (
+                <Link
+                  href="/courses/new"
+                  className="font-medium text-text-muted hover:text-text transition-colors"
+                >
+                  New Course
+                </Link>
+              )}
+              <Link
+                href="/notifications"
+                className="font-medium text-text-muted hover:text-text transition-colors"
+              >
+                Notifications
+              </Link>
+              <Link
+                href="/settings"
+                className="font-medium text-text-muted hover:text-text transition-colors"
+              >
+                Settings
+              </Link>
+              <NotificationBell />
               <span className="text-sm text-text-muted/60">|</span>
-              <span className="text-sm font-medium text-text">{user.name}</span>
+              <Link
+                href="/settings"
+                className="text-sm font-medium text-text hover:text-primary transition-colors"
+              >
+                {user.name}
+              </Link>
               <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
                 user.role === "ADMIN"
                   ? "bg-accent/10 text-accent"
