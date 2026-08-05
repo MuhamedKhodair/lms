@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { QuizPlayer } from "@/components/quiz-player";
 import type { QuizQuestionResponse } from "@/types";
@@ -71,13 +72,13 @@ export default function QuizPage() {
     <div className="mx-auto max-w-3xl px-4 py-8">
       {/* Breadcrumb */}
       <nav className="flex items-center gap-2 text-sm text-text-muted mb-8">
-        <a href="/courses" className="hover:text-text transition-colors">Courses</a>
+        <Link href="/courses" className="hover:text-text transition-colors">Courses</Link>
         <span>/</span>
         {courseTitle && (
           <>
-            <a href={`/courses/${quiz.courseId || quiz.lesson?.module?.courseId}`} className="hover:text-text transition-colors">
+            <Link href={`/courses/${quiz.courseId || quiz.lesson?.module?.courseId}`} className="hover:text-text transition-colors">
               {courseTitle}
-            </a>
+            </Link>
             <span>/</span>
           </>
         )}
@@ -93,7 +94,14 @@ export default function QuizPage() {
           quizId={quiz.id}
           title={quiz.title}
           questions={quiz.questions}
-          onComplete={() => {/* optionally refresh / navigate */}}
+          onComplete={async () => {
+            if (!quiz.lessonId) return;
+            const token = localStorage.getItem("token");
+            await fetch(`/api/lessons/${quiz.lessonId}/progress`, {
+              method: "POST",
+              headers: { Authorization: `Bearer ${token}` },
+            });
+          }}
         />
       )}
     </div>

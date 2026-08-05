@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import type { QuizQuestionResponse } from "@/types";
 
@@ -11,12 +11,23 @@ interface QuizPlayerProps {
   onComplete: (score: number, totalPoints: number, earnedPoints: number) => void;
 }
 
+interface QuestionResult {
+  questionId: string;
+  questionText: string;
+  type: string;
+  userAnswer: string | null;
+  correctAnswer: string;
+  correct: boolean;
+  points: number;
+}
+
 export function QuizPlayer({ quizId, title, questions, onComplete }: QuizPlayerProps) {
   const { token } = useAuth();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
   const [result, setResult] = useState<{ score: number; earnedPoints: number; totalPoints: number } | null>(null);
+  const [questionResults, setQuestionResults] = useState<QuestionResult[] | null>(null);
   const [error, setError] = useState("");
 
   const question = questions[currentIndex];
@@ -44,6 +55,7 @@ export function QuizPlayer({ quizId, title, questions, onComplete }: QuizPlayerP
 
       const data = await res.json();
       setResult({ score: data.score, earnedPoints: data.earnedPoints, totalPoints: data.totalPoints });
+      setQuestionResults(data.questionResults || null);
       setSubmitted(true);
       onComplete(data.score, data.totalPoints, data.earnedPoints);
     } catch (e) {
@@ -90,11 +102,52 @@ export function QuizPlayer({ quizId, title, questions, onComplete }: QuizPlayerP
         <p className="mt-2 text-text-muted">
           You earned {result.earnedPoints} out of {result.totalPoints} points
         </p>
+        {questionResults && (
+          <div className="mt-8 text-left">
+            <h3 className="font-semibold text-text">Question breakdown</h3>
+            <div className="mt-4 space-y-3">
+              {questionResults.map((qr, i) => (
+                <div
+                  key={qr.questionId}
+                  className={`rounded-lg border px-4 py-3 ${
+                    qr.correct
+                      ? "border-emerald-200 bg-emerald-50/60 dark:border-emerald-900 dark:bg-emerald-950/40"
+                      : "border-red-200 bg-red-50/60 dark:border-red-900 dark:bg-red-950/40"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="text-sm font-medium text-text">
+                      {i + 1}. {qr.questionText}
+                    </p>
+                    <span className={`shrink-0 text-xs font-semibold ${
+                      qr.correct ? "text-emerald-600 dark:text-emerald-400" : "text-red-500"
+                    }`}>
+                      {qr.correct ? "Correct" : "Incorrect"}
+                    </span>
+                  </div>
+                  <div className="mt-2 space-y-1 text-sm">
+                    <p className="text-text-muted">
+                      Your answer: <span className={qr.correct ? "text-emerald-600 dark:text-emerald-400 font-medium" : "text-red-500 font-medium"}>
+                        {qr.userAnswer || "(no answer)"}
+                      </span>
+                    </p>
+                    {!qr.correct && (
+                      <p className="text-text-muted">
+                        Correct answer: <span className="text-emerald-600 dark:text-emerald-400 font-medium">{qr.correctAnswer}</span>
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="mt-8 flex justify-center gap-3">
           <button
             onClick={() => {
               setSubmitted(false);
               setResult(null);
+              setQuestionResults(null);
               setAnswers({});
               setCurrentIndex(0);
             }}

@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAuthUser } from "@/lib/auth";
 import { apiSuccess, apiError } from "@/lib/utils";
+import { sendEmail, enrollmentEmail } from "@/lib/email";
 
 export async function POST(
   request: NextRequest,
@@ -23,6 +24,19 @@ export async function POST(
     const enrollment = await prisma.enrollment.create({
       data: { userId: user.id, courseId: id },
     });
+
+    await Promise.all([
+      sendEmail({ ...enrollmentEmail(user.name, course.title), to: user.email }).catch((e) =>
+        console.error("Enrollment email failed:", e)
+      ),
+      prisma.notification.create({
+        data: {
+          userId: user.id,
+          type: "success",
+          message: `You enrolled in "${course.title}"`,
+        },
+      }),
+    ]);
 
     return apiSuccess(enrollment, 201);
   } catch (error) {

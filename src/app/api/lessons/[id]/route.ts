@@ -59,3 +59,29 @@ export async function PUT(
     return apiError("Internal server error", 500);
   }
 }
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const user = await getAuthUser(request);
+    if (!user) return apiError("Unauthorized", 401);
+
+    const lesson = await prisma.lesson.findUnique({
+      where: { id },
+      include: { module: { include: { course: true } } },
+    });
+    if (!lesson) return apiError("Lesson not found", 404);
+    if (lesson.module.course.instructorId !== user.id && user.role !== "ADMIN") {
+      return apiError("Forbidden", 403);
+    }
+
+    await prisma.lesson.delete({ where: { id } });
+    return apiSuccess({ message: "Lesson deleted" });
+  } catch (error) {
+    console.error("Lesson DELETE error:", error);
+    return apiError("Internal server error", 500);
+  }
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, FormEvent } from "react";
+import { useCallback, useState, useEffect, FormEvent } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 
@@ -11,19 +11,26 @@ export default function RegisterPage() {
   const [role, setRole] = useState("STUDENT");
   const [error, setError] = useState("");
   const { register, user, loading } = useAuth();
+  const dashboardUrl = process.env.NEXT_PUBLIC_DASHBOARD_URL || "http://localhost:3001";
+
+  const homeHref = useCallback(
+    (role?: string) =>
+      role === "ADMIN" || role === "INSTRUCTOR" ? `${dashboardUrl}/dashboard` : "/dashboard",
+    [dashboardUrl]
+  );
 
   useEffect(() => {
     if (!loading && user) {
-      window.location.href = "/dashboard";
+      window.location.href = homeHref(user.role);
     }
-  }, [user, loading]);
+  }, [user, loading, homeHref]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
     try {
-      await register(name, email, password, role);
-      window.location.href = "/dashboard";
+      const created = await register(name, email, password, role);
+      window.location.href = homeHref(created.role);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Registration failed");
     }

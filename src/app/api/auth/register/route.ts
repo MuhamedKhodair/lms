@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { hashPassword, signToken } from "@/lib/auth";
 import { registerSchema, apiError } from "@/lib/utils";
 import { rateLimit, clientKey, rateLimitResponse } from "@/lib/rate-limit";
+import { sendEmail, welcomeEmail } from "@/lib/email";
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,6 +30,10 @@ export async function POST(request: NextRequest) {
     });
 
     const token = signToken({ userId: user.id, email: user.email, role: user.role });
+
+    sendEmail({ ...welcomeEmail(user.name), to: user.email }).catch((e) =>
+      console.error("Welcome email failed:", e)
+    );
 
     const response = NextResponse.json({ user, token }, { status: 201 });
 

@@ -7,6 +7,8 @@ import { ThemeToggle } from "@/components/theme-toggle";
 
 export function Header() {
   const { user, logout } = useAuth();
+  const dashboardUrl = process.env.NEXT_PUBLIC_DASHBOARD_URL || "http://localhost:3001";
+  const isStaff = user?.role === "ADMIN" || user?.role === "INSTRUCTOR";
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md">
@@ -24,26 +26,19 @@ export function Header() {
           </Link>
           {user ? (
             <>
-              {user.role === "ADMIN" && (
-                <Link
-                  href="/admin"
+              {isStaff ? (
+                <a
+                  href={`${dashboardUrl}/dashboard`}
                   className="font-medium text-text-muted hover:text-text transition-colors"
                 >
-                  Admin
-                </Link>
-              )}
-              <Link
-                href="/dashboard"
-                className="font-medium text-text-muted hover:text-text transition-colors"
-              >
-                Dashboard
-              </Link>
-              {(user.role === "INSTRUCTOR" || user.role === "ADMIN") && (
+                  Teacher Dashboard
+                </a>
+              ) : (
                 <Link
-                  href="/courses/new"
+                  href="/dashboard"
                   className="font-medium text-text-muted hover:text-text transition-colors"
                 >
-                  New Course
+                  Dashboard
                 </Link>
               )}
               <Link

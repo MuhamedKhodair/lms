@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, FormEvent } from "react";
+import { useCallback, useState, useEffect, FormEvent } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 
@@ -9,19 +9,26 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const { login, user, loading } = useAuth();
+  const dashboardUrl = process.env.NEXT_PUBLIC_DASHBOARD_URL || "http://localhost:3001";
+
+  const homeHref = useCallback(
+    (role?: string) =>
+      role === "ADMIN" || role === "INSTRUCTOR" ? `${dashboardUrl}/dashboard` : "/dashboard",
+    [dashboardUrl]
+  );
 
   useEffect(() => {
     if (!loading && user) {
-      window.location.href = "/dashboard";
+      window.location.href = homeHref(user.role);
     }
-  }, [user, loading]);
+  }, [user, loading, homeHref]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
     try {
-      await login(email, password);
-      window.location.href = "/dashboard";
+      const loggedIn = await login(email, password);
+      window.location.href = homeHref(loggedIn.role);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Login failed");
     }

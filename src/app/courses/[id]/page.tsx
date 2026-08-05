@@ -20,11 +20,6 @@ export default function CourseDetailPage() {
   const [loading, setLoading] = useState(true);
   const [enrolled, setEnrolled] = useState(false);
   const [progress, setProgress] = useState<ProgressData | null>(null);
-  const [moduleTitle, setModuleTitle] = useState("");
-  const [lessonTitle, setLessonTitle] = useState("");
-  const [lessonContent, setLessonContent] = useState("");
-  const [lessonContentType, setLessonContentType] = useState("text");
-  const [lessonVideoUrl, setLessonVideoUrl] = useState("");
   const [activeLesson, setActiveLesson] = useState<string | null>(null);
   const [lessonData, setLessonData] = useState<LessonResponse | null>(null);
   const [quizAnswers, setQuizAnswers] = useState<Record<string, string>>({});
@@ -32,16 +27,10 @@ export default function CourseDetailPage() {
   const [discussionTitle, setDiscussionTitle] = useState("");
   const [discussionContent, setDiscussionContent] = useState("");
   const [discussions, setDiscussions] = useState<Record<string, unknown>[]>([]);
+  const [replyText, setReplyText] = useState("");
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [commentText, setCommentText] = useState("");
-  const [instructorMenuOpen, setInstructorMenuOpen] = useState(false);
-  const [courseEditOpen, setCourseEditOpen] = useState(false);
-  const [editTitle, setEditTitle] = useState("");
-  const [editDescription, setEditDescription] = useState("");
-  const [editCategory, setEditCategory] = useState("");
-  const [editPrice, setEditPrice] = useState(0);
-  const [editImageUrl, setEditImageUrl] = useState("");
-  const [editPublished, setEditPublished] = useState(false);
-  const [editing, setEditing] = useState(false);
+  const [courseQuizzes, setCourseQuizzes] = useState<Record<string, unknown>[]>([]);
 
   useEffect(() => {
     async function load() {
@@ -73,6 +62,12 @@ export default function CourseDetailPage() {
           const discData = await discRes.json();
           setDiscussions(discData);
         }
+
+        const quizRes = await fetch(`/api/quizzes?courseId=${id}`);
+        if (quizRes.ok) {
+          const quizData = await quizRes.json();
+          setCourseQuizzes(quizData.data || quizData);
+        }
       }
     }
     load();
@@ -89,84 +84,6 @@ export default function CourseDetailPage() {
     } else {
       const data = await res.json();
       alert(data.error || "Enrollment failed");
-    }
-  }
-
-  async function handleAddModule() {
-    if (!moduleTitle.trim()) return;
-    const token = localStorage.getItem("token");
-    const order = (course?.modules?.length || 0);
-    const res = await fetch(`/api/courses/${id}/modules`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ title: moduleTitle, order }),
-    });
-    if (res.ok) {
-      setModuleTitle("");
-      const newModule = await res.json();
-      setCourse((prev) =>
-        prev ? { ...prev, modules: [...(prev.modules || []), newModule] } : prev
-      );
-    }
-  }
-
-  async function handleAddLesson(moduleId: string) {
-    if (!lessonTitle.trim()) return;
-    const token = localStorage.getItem("token");
-    const mod = course?.modules?.find((m) => m.id === moduleId);
-    const order = mod?.lessons?.length || 0;
-
-    const body: Record<string, unknown> = {
-      title: lessonTitle,
-      contentType: lessonContentType,
-      order,
-    };
-    if (lessonContentType === "text") body.content = lessonContent;
-    if (lessonContentType === "video") body.videoUrl = lessonVideoUrl;
-
-    const res = await fetch(`/api/modules/${moduleId}/lessons`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify(body),
-    });
-    if (res.ok) {
-      setLessonTitle("");
-      setLessonContent("");
-      setLessonVideoUrl("");
-      const newLesson = await res.json();
-      setCourse((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          modules: prev.modules?.map((m) =>
-            m.id === moduleId ? { ...m, lessons: [...(m.lessons || []), newLesson] } : m
-          ),
-        };
-      });
-    }
-  }
-
-  async function handleEditCourse() {
-    const token = localStorage.getItem("token");
-    const res = await fetch(`/api/courses/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({
-        title: editTitle,
-        description: editDescription,
-        category: editCategory,
-        price: editPrice,
-        imageUrl: editImageUrl,
-        published: editPublished,
-      }),
-    });
-    if (res.ok) {
-      const updated = await res.json();
-      setCourse(updated);
-      setCourseEditOpen(false);
-      setEditing(false);
-    } else {
-      alert("Failed to update course");
     }
   }
 
@@ -215,6 +132,11 @@ export default function CourseDetailPage() {
     if (res.ok) {
       const result = await res.json();
       setQuizResult(result);
+
+      const quiz = lessonData?.quizzes?.find((q) => q.id === quizId);
+      if (quiz?.lessonId && activeLesson) {
+        await markComplete(quiz.lessonId);
+      }
     } else {
       const data = await res.json();
       alert(data.error || "Quiz submission failed");
@@ -234,6 +156,28 @@ export default function CourseDetailPage() {
       setDiscussionContent("");
       const newDisc = await res.json();
       setDiscussions((prev) => [newDisc, ...prev]);
+    }
+  }
+
+  async function handleAddReply(discussionId: string) {
+    if (!replyText.trim()) return;
+    const token = localStorage.getItem("token");
+    const res = await fetch(`/api/discussions/${discussionId}/replies`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ content: replyText }),
+    });
+    if (res.ok) {
+      const newReply = await res.json();
+      setDiscussions((prev) =>
+        prev.map((d) => {
+          if (d.id !== discussionId) return d;
+          const replies = (d.replies as Record<string, unknown>[]) || [];
+          return { ...d, replies: [...replies, newReply] };
+        })
+      );
+      setReplyText("");
+      setReplyingTo(null);
     }
   }
 
@@ -330,66 +274,15 @@ export default function CourseDetailPage() {
                 <span className="inline-flex items-center rounded-full bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary">
                   You are the instructor
                 </span>
-                <div className="relative">
-                  <button
-                    onClick={() => setInstructorMenuOpen(!instructorMenuOpen)}
-                    className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-3 py-1.5 text-sm font-medium text-text hover:bg-surface transition-colors"
-                  >
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 12a.75.75 0 110-1.5.75.75 0 010 1.5zM12 18.75a.75.75 0 110-1.5.75.75 0 010 1.5z" />
-                    </svg>
-                    Manage
-                  </button>
-                  {instructorMenuOpen && (
-                    <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-xl border border-border bg-card shadow-lg overflow-hidden">
-                      <Link
-                        href={`/courses/${id}/quizzes/new`}
-                        onClick={() => setInstructorMenuOpen(false)}
-                        className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-text hover:bg-surface transition-colors"
-                      >
-                        <svg className="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
-                        </svg>
-                        New Quiz
-                      </Link>
-                      <button
-                        onClick={() => {
-                          setEditTitle(course.title);
-                          setEditDescription(course.description);
-                          setEditCategory(course.category || "");
-                          setEditPrice(course.price);
-                          setEditImageUrl(course.imageUrl || "");
-                          setEditPublished(course.published);
-                          setCourseEditOpen(true);
-                          setInstructorMenuOpen(false);
-                        }}
-                        className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-text hover:bg-surface transition-colors text-left"
-                      >
-                        <svg className="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zM8 13a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm18 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
-                        </svg>
-                        Edit Course
-                      </button>
-                      <button
-                        onClick={async () => {
-                          if (!confirm("Are you sure you want to delete this course? This action cannot be undone.")) return;
-                          const token = localStorage.getItem("token");
-                          await fetch(`/api/courses/${id}`, {
-                            method: "DELETE",
-                            headers: { Authorization: `Bearer ${token}` },
-                          });
-                          router.push("/courses");
-                        }}
-                        className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-danger hover:bg-danger/5 transition-colors text-left"
-                      >
-                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                        </svg>
-                        Delete Course
-                      </button>
-                    </div>
-                  )}
-                </div>
+                <a
+                  href={`${process.env.NEXT_PUBLIC_DASHBOARD_URL || "http://localhost:3001"}/dashboard/courses/${id}`}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark shadow-xs transition-colors"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.397.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.272-.806.108-1.204-.165-.397-.506-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.107-1.204l-.527-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894z" />
+                  </svg>
+                  Manage in Dashboard
+                </a>
               </div>
             ) : (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
@@ -422,24 +315,6 @@ export default function CourseDetailPage() {
             <h2 className="text-lg font-semibold text-text">Course content</h2>
             <p className="text-sm text-text-muted mt-1">{course.modules?.length || 0} modules</p>
 
-            {isInstructor && (
-              <div className="mt-4 flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Module title"
-                  value={moduleTitle}
-                  onChange={(e) => setModuleTitle(e.target.value)}
-                  className="block flex-1 rounded-lg border border-border bg-white px-3 py-2 text-sm shadow-xs focus:border-primary focus:ring-1 focus:ring-primary outline-none"
-                />
-                <button
-                  onClick={handleAddModule}
-                  className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary-dark shadow-xs transition-colors"
-                >
-                  Add
-                </button>
-              </div>
-            )}
-
             <div className="mt-4 space-y-3">
               {course.modules?.map((mod, modIdx) => (
                 <div key={mod.id} className="rounded-xl border border-border bg-card overflow-hidden">
@@ -447,86 +322,43 @@ export default function CourseDetailPage() {
                     <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-xs font-semibold text-primary">
                       {modIdx + 1}
                     </span>
-                    <h3 className="font-medium text-text text-sm">{mod.title}</h3>
-                    <span className="ml-auto text-xs text-text-muted">{mod.lessons?.length || 0} lessons</span>
+                    <h3 className="font-medium text-text text-sm flex-1 truncate">{mod.title}</h3>
+                    <span className="text-xs text-text-muted">{mod.lessons?.length || 0} lessons</span>
                   </div>
                   <ul className="divide-y divide-border">
                     {mod.lessons?.map((lesson) => (
                       <li key={lesson.id}>
-                        <button
-                          onClick={() => viewLesson(lesson)}
-                          className={`w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors ${
-                            activeLesson === lesson.id
-                              ? "bg-primary/5 text-primary font-medium"
-                              : "text-text-muted hover:bg-surface hover:text-text"
-                          }`}
-                        >
-                          <span className={`flex-shrink-0 flex h-5 w-5 items-center justify-center rounded-full border ${
-                            lesson.completed
-                              ? "bg-success border-success text-white"
-                              : activeLesson === lesson.id
-                              ? "border-primary text-primary"
-                              : "border-border"
-                          }`}>
-                            {lesson.completed ? (
-                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-                            ) : activeLesson === lesson.id ? (
-                              <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-                            ) : null}
-                          </span>
-                          <span className="flex-1">{lesson.title}</span>
-                          {lesson.duration && (
-                            <span className="text-xs text-text-muted/60">{lesson.duration}min</span>
-                          )}
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => viewLesson(lesson)}
+                            className={`flex-1 flex items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors ${
+                              activeLesson === lesson.id
+                                ? "bg-primary/5 text-primary font-medium"
+                                : "text-text-muted hover:bg-surface hover:text-text"
+                            }`}
+                          >
+                            <span className={`flex-shrink-0 flex h-5 w-5 items-center justify-center rounded-full border ${
+                              lesson.completed
+                                ? "bg-success border-success text-white"
+                                : activeLesson === lesson.id
+                                ? "border-primary text-primary"
+                                : "border-border"
+                            }`}>
+                              {lesson.completed ? (
+                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                              ) : activeLesson === lesson.id ? (
+                                <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                              ) : null}
+                            </span>
+                            <span className="flex-1 truncate">{lesson.title}</span>
+                            {lesson.duration && (
+                              <span className="text-xs text-text-muted/60">{lesson.duration}min</span>
+                            )}
+                          </button>
+                        </div>
                       </li>
                     ))}
                   </ul>
-
-                  {isInstructor && (
-                    <div className="border-t border-border p-3 space-y-2 bg-surface/30">
-                      <input
-                        type="text"
-                        placeholder="Lesson title"
-                        value={lessonTitle}
-                        onChange={(e) => setLessonTitle(e.target.value)}
-                        className="block w-full rounded-lg border border-border bg-white px-2 py-1.5 text-xs focus:border-primary focus:ring-1 focus:ring-primary outline-none"
-                      />
-                      <select
-                        value={lessonContentType}
-                        onChange={(e) => setLessonContentType(e.target.value)}
-                        className="block w-full rounded-lg border border-border bg-white px-2 py-1.5 text-xs focus:border-primary focus:ring-1 focus:ring-primary outline-none"
-                      >
-                        <option value="text">Text</option>
-                        <option value="video">Video</option>
-                        <option value="file">File</option>
-                      </select>
-                      {lessonContentType === "text" && (
-                        <textarea
-                          placeholder="Content"
-                          rows={2}
-                          value={lessonContent}
-                          onChange={(e) => setLessonContent(e.target.value)}
-                          className="block w-full rounded-lg border border-border bg-white px-2 py-1.5 text-xs focus:border-primary focus:ring-1 focus:ring-primary outline-none"
-                        />
-                      )}
-                      {lessonContentType === "video" && (
-                        <input
-                          type="text"
-                          placeholder="Video URL"
-                          value={lessonVideoUrl}
-                          onChange={(e) => setLessonVideoUrl(e.target.value)}
-                          className="block w-full rounded-lg border border-border bg-white px-2 py-1.5 text-xs focus:border-primary focus:ring-1 focus:ring-primary outline-none"
-                        />
-                      )}
-                      <button
-                        onClick={() => handleAddLesson(mod.id)}
-                        className="w-full rounded-lg bg-primary/10 px-2 py-1.5 text-xs font-medium text-primary hover:bg-primary/20 transition-colors"
-                      >
-                        Add Lesson
-                      </button>
-                    </div>
-                  )}
                 </div>
               ))}
               {(!course.modules || course.modules.length === 0) && (
@@ -751,14 +583,69 @@ export default function CourseDetailPage() {
           <div className="mt-4 space-y-3">
             {discussions.map((d) => (
               <div key={d.id as string} className="rounded-xl border border-border bg-card p-5">
-                <h3 className="font-semibold text-text">{d.title as string}</h3>
-                <p className="mt-1.5 text-sm text-text-muted">{d.content as string}</p>
-                <p className="mt-2 text-xs text-text-muted/60 flex items-center gap-1.5">
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
-                    {(d.user as { name: string })?.name?.charAt(0) || "?"}
-                  </span>
-                  {(d.user as { name: string })?.name}
-                </p>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h3 className="font-semibold text-text">{d.title as string}</h3>
+                    <p className="mt-1.5 text-sm text-text-muted">{d.content as string}</p>
+                    <p className="mt-2 text-xs text-text-muted/60 flex items-center gap-1.5">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
+                        {(d.user as { name: string })?.name?.charAt(0) || "?"}
+                      </span>
+                      {(d.user as { name: string })?.name}
+                    </p>
+                  </div>
+                  {user && (
+                    <button
+                      onClick={() => {
+                        setReplyingTo(replyingTo === (d.id as string) ? null : (d.id as string));
+                        setReplyText("");
+                      }}
+                      className="shrink-0 text-xs font-medium text-primary hover:text-primary-dark transition-colors"
+                    >
+                      Reply
+                    </button>
+                  )}
+                </div>
+
+                {(d.replies as Record<string, unknown>[])?.length > 0 && (
+                  <div className="mt-3 space-y-2 border-l-2 border-border pl-4">
+                    {(d.replies as Record<string, unknown>[]).map((r) => (
+                      <div key={r.id as string} className="flex items-start gap-2">
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent/10 text-[10px] font-medium text-accent">
+                          {((r.user as { name: string })?.name?.charAt(0) || "?").toUpperCase()}
+                        </span>
+                        <div>
+                          <span className="text-xs font-medium text-text">
+                            {(r.user as { name: string })?.name}
+                          </span>
+                          <p className="text-sm text-text-muted">{r.content as string}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {replyingTo === (d.id as string) && (
+                  <div className="mt-3 flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Write a reply..."
+                      value={replyText}
+                      onChange={(e) => setReplyText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleAddReply(d.id as string);
+                      }}
+                      className="block flex-1 rounded-lg border border-border bg-white px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                      autoFocus
+                    />
+                    <button
+                      onClick={() => handleAddReply(d.id as string)}
+                      className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark shadow-xs transition-colors"
+                    >
+                      Reply
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
             {discussions.length === 0 && (
@@ -769,102 +656,28 @@ export default function CourseDetailPage() {
           </div>
         </div>
 
-        {/* ===== Edit Course Modal ===== */}
-        {courseEditOpen && (
-          <div
-            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-xs px-4"
-            onClick={(e) => e.target === e.currentTarget && setCourseEditOpen(false)}
-          >
-            <div
-              className="w-full max-w-lg rounded-xl border border-border bg-card p-6 shadow-2xl max-h-[90vh] overflow-y-auto"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-text">Edit course</h2>
-                <button
-                  onClick={() => setCourseEditOpen(false)}
-                  className="rounded-lg p-1.5 text-text-muted hover:bg-surface hover:text-text transition-colors"
-                >
-                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              <div className="mt-5 space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-text">Title</label>
-                  <input
-                    type="text"
-                    value={editTitle}
-                    onChange={(e) => setEditTitle(e.target.value)}
-                    className="mt-1.5 block w-full rounded-lg border border-border bg-card px-3 py-2.5 text-sm text-text placeholder:text-text-muted shadow-xs focus:border-primary focus:ring-1 focus:ring-primary outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-text">Description</label>
-                  <textarea
-                    value={editDescription}
-                    onChange={(e) => setEditDescription(e.target.value)}
-                    rows={3}
-                    className="mt-1.5 block w-full rounded-lg border border-border bg-card px-3 py-2.5 text-sm text-text placeholder:text-text-muted shadow-xs focus:border-primary focus:ring-1 focus:ring-primary outline-none"
-                  />
-                </div>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="block text-sm font-medium text-text">Category</label>
-                    <input
-                      type="text"
-                      value={editCategory}
-                      onChange={(e) => setEditCategory(e.target.value)}
-                      className="mt-1.5 block w-full rounded-lg border border-border bg-card px-3 py-2.5 text-sm text-text placeholder:text-text-muted shadow-xs focus:border-primary focus:ring-1 focus:ring-primary outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-text">Price ($)</label>
-                    <input
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={editPrice}
-                      onChange={(e) => setEditPrice(parseFloat(e.target.value) || 0)}
-                      className="mt-1.5 block w-full rounded-lg border border-border bg-card px-3 py-2.5 text-sm text-text placeholder:text-text-muted shadow-xs focus:border-primary focus:ring-1 focus:ring-primary outline-none"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-text">Image URL</label>
-                  <input
-                    type="text"
-                    value={editImageUrl}
-                    onChange={(e) => setEditImageUrl(e.target.value)}
-                    className="mt-1.5 block w-full rounded-lg border border-border bg-card px-3 py-2.5 text-sm text-text placeholder:text-text-muted shadow-xs focus:border-primary focus:ring-1 focus:ring-primary outline-none"
-                  />
-                </div>
-                <label className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    checked={editPublished}
-                    onChange={(e) => setEditPublished(e.target.checked)}
-                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-                  />
-                  <span className="text-sm text-text">Published</span>
-                </label>
-                <div className="flex gap-3 pt-2">
-                  <button
-                    onClick={handleEditCourse}
-                    disabled={editing}
-                    className="flex-1 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-dark shadow-xs transition-all disabled:opacity-50"
+        {/* ===== Course Quizzes ===== */}
+        {courseQuizzes.filter((q) => q.lessonId == null).length > 0 && (
+          <div className="mt-12">
+            <h2 className="text-lg font-semibold text-text flex items-center gap-2">
+              <svg className="w-5 h-5 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              Course Quizzes
+            </h2>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {courseQuizzes
+                .filter((q) => q.lessonId == null)
+                .map((q) => (
+                  <Link
+                    key={q.id as string}
+                    href={`/quizzes/${q.id as string}`}
+                    className="flex items-center justify-between rounded-xl border border-border bg-card px-5 py-4 transition-all hover:shadow-xs hover:border-primary/20"
                   >
-                    {editing ? "Saving..." : "Save changes"}
-                  </button>
-                  <button
-                    onClick={() => setCourseEditOpen(false)}
-                    className="rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-text hover:bg-surface transition-colors"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
+                    <span className="font-medium text-text">{q.title as string}</span>
+                    <svg className="h-4 w-4 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </Link>
+                ))}
             </div>
           </div>
         )}

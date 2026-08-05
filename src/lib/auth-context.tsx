@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable react-hooks/set-state-in-effect */
+
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import type { UserResponse } from "@/types";
 
@@ -7,8 +9,8 @@ interface AuthContextType {
   user: UserResponse | null;
   token: string | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string, role: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<UserResponse>;
+  register: (name: string, email: string, password: string, role: string) => Promise<UserResponse>;
   logout: () => void;
   updateProfile: (data: { name?: string; email?: string }) => Promise<void>;
 }
@@ -56,7 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     document.cookie = "token=; path=/; max-age=0";
   }
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string): Promise<UserResponse> => {
     const res = await fetch("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -68,9 +70,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setTokenCookie(data.token);
     setToken(data.token);
     setUser(data.user);
+    return data.user as UserResponse;
   };
 
-  const register = async (name: string, email: string, password: string, role: string) => {
+  const register = async (name: string, email: string, password: string, role: string): Promise<UserResponse> => {
     const res = await fetch("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -82,6 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setTokenCookie(data.token);
     setToken(data.token);
     setUser(data.user);
+    return data.user as UserResponse;
   };
 
   const logout = () => {

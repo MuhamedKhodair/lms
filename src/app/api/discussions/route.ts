@@ -14,6 +14,11 @@ export async function GET(request: NextRequest) {
       where,
       include: {
         user: { select: { id: true, name: true } },
+        replies: {
+          include: { user: { select: { id: true, name: true } } },
+          orderBy: { createdAt: "asc" },
+        },
+        _count: { select: { replies: true } },
       },
       orderBy: { createdAt: "desc" },
     });
